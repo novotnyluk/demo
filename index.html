@@ -13,7 +13,17 @@
       <div id="playerScore" class="score">0</div>
       <div class="score-sep">—</div>
       <div id="computerScore" class="score">0</div>
+
+      <div id="controls">
+        <label for="difficulty">Difficulty</label>
+        <select id="difficulty" aria-label="Computer difficulty">
+          <option value="easy">Easy</option>
+          <option value="medium">Medium</option>
+          <option value="hard">Hard</option>
+        </select>
+      </div>
     </div>
+
     <canvas id="canvas" width="800" height="500"></canvas>
     <div id="info">Move the left paddle with your mouse or the ↑ / ↓ keys. Click canvas to (re)start.</div>
   </div>

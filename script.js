@@ -1,4 +1,4 @@
-// Simple Pong game
+// Simple Pong game with difficulty levels for the computer AI.
 // Controls: mousemove or ArrowUp / ArrowDown to move left paddle
 // Click the canvas to (re)start
 
@@ -26,8 +26,10 @@ const computer = {
   y: (H - paddleHeight) / 2,
   width: paddleWidth,
   height: paddleHeight,
+  // speed will be set by difficulty
   speed: 5,
-  score: 0
+  score: 0,
+  error: 0.12 // how inaccurate the AI is (0 = perfect)
 };
 
 const ball = {
@@ -43,26 +45,52 @@ let running = false;
 let lastTime = 0;
 let keys = { up: false, down: false };
 
-// DOM scoreboard
+// DOM scoreboard & controls
 const playerScoreEl = document.getElementById('playerScore');
 const computerScoreEl = document.getElementById('computerScore');
+const difficultySelect = document.getElementById('difficulty');
 
-// Utility
+// Difficulty settings
+const difficultySettings = {
+  easy:   { speed: 3.5, error: 0.38 }, // slow, larger error
+  medium: { speed: 5.0, error: 0.12 }, // balanced
+  hard:   { speed: 8.0, error: 0.02 }  // fast, tiny error
+};
+
 function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
 function randRange(a,b){ return a + Math.random()*(b-a); }
 
+function setDifficulty(level){
+  const s = difficultySettings[level] || difficultySettings.medium;
+  computer.speed = s.speed;
+  computer.error = s.error;
+  // persist
+  try { localStorage.setItem('pong-difficulty', level); } catch(e){}
+  difficultySelect.value = level;
+}
+
+// initialize difficulty from localStorage or default
+const stored = (function(){ try { return localStorage.getItem('pong-difficulty'); } catch(e){ return null; } })();
+setDifficulty(stored || 'medium');
+
+difficultySelect.addEventListener('change', (e)=>{
+  setDifficulty(e.target.value);
+});
+
+// serve the ball, optionally biasing serve direction so the winner receives the next serve
 function resetBall(winner){
   ball.x = W/2;
   ball.y = H/2;
   ball.speed = 6;
-  // serve toward the player who lost (so winner receives the serve)
-  const dir = winner === 'player' ? -1 : 1;
+  // if winner specified, serve toward the opponent of the winner (so the loser receives)
+  let dir = Math.random() < 0.5 ? -1 : 1;
+  if(winner === 'player') dir = -1;
+  if(winner === 'computer') dir = 1;
   const angle = randRange(-Math.PI/4, Math.PI/4);
   ball.vx = dir * ball.speed * Math.cos(angle);
   ball.vy = ball.speed * Math.sin(angle);
   running = false;
-  // brief pause before restarting
-  setTimeout(()=> running = true, 600);
+  setTimeout(()=> running = true, 500);
 }
 
 function startGame(){
@@ -101,7 +129,6 @@ window.addEventListener('keyup', (e)=>{
 // Click canvas to start/restart
 canvas.addEventListener('click', ()=>{
   if(!running){
-    // If scores are zero, start fresh; otherwise keep scores and serve
     resetBall(null);
   }
   running = true;
@@ -109,7 +136,6 @@ canvas.addEventListener('click', ()=>{
 
 // Collision detection between ball and rectangle paddle
 function intersectsBallRect(bx, by, br, rx, ry, rw, rh){
-  // Closest point on rectangle to circle center
   const closestX = clamp(bx, rx, rx + rw);
   const closestY = clamp(by, ry, ry + rh);
   const dx = bx - closestX;
@@ -125,11 +151,18 @@ function update(dt){
   if(keys.down) player.y += player.speed;
   player.y = clamp(player.y, 0, H - player.height);
 
-  // Computer AI: follow ball with limited speed, add small deadzone
-  const targetY = ball.y - computer.height/2;
+  // Computer AI: follow ball with limited speed and an error/jitter depending on difficulty
+  // The AI is less accurate if the difficulty error is higher.
+  // It uses a randomized offset to avoid being perfectly predictable.
+  let targetY = ball.y - computer.height / 2;
+  // error only really matters when ball is moving toward the computer; otherwise smaller error
+  const approachFactor = ball.vx > 0 ? 1.0 : 0.25;
+  const jitter = (Math.random() - 0.5) * computer.height * computer.error * approachFactor;
+  targetY += jitter;
+
   const diff = targetY - computer.y;
-  const followSpeed = computer.speed + Math.min(0.01*ball.speed, 2);
-  if(Math.abs(diff) > 4){
+  const followSpeed = computer.speed + Math.min(0.01 * ball.speed, 2); // scales a bit with ball speed
+  if(Math.abs(diff) > 2){
     computer.y += Math.sign(diff) * Math.min(followSpeed, Math.abs(diff));
   }
   computer.y = clamp(computer.y, 0, H - computer.height);
@@ -150,7 +183,6 @@ function update(dt){
   // Paddle collisions
   // Left paddle (player)
   if(intersectsBallRect(ball.x, ball.y, ball.r, player.x, player.y, player.width, player.height) && ball.vx < 0){
-    // compute collision point to vary angle
     const collidePoint = (ball.y - (player.y + player.height/2));
     const normalized = collidePoint / (player.height/2);
     const maxBounce = Math.PI/3; // 60 degrees
@@ -158,7 +190,6 @@ function update(dt){
     ball.speed = Math.min(12, ball.speed + 0.25);
     ball.vx = Math.abs(ball.speed * Math.cos(bounceAngle));
     ball.vy = ball.speed * Math.sin(bounceAngle);
-    // push ball outside paddle
     ball.x = player.x + player.width + ball.r + 0.1;
   }
 
