@@ -8,6 +8,10 @@ const ctx = canvas.getContext('2d');
 const W = canvas.width;
 const H = canvas.height;
 
+// Colors
+const playerColor = '#9be7ff'; // left paddle - blue
+const computerColor = '#ff4d4d'; // right paddle - red
+
 // Game objects
 const paddleWidth = 12;
 const paddleHeight = 110;
@@ -240,8 +244,10 @@ function draw(){
   drawNet();
 
   // paddles
-  ctx.fillStyle = '#9be7ff';
+  ctx.fillStyle = playerColor;
   roundRect(ctx, player.x, player.y, player.width, player.height, 4, true, false);
+
+  ctx.fillStyle = computerColor;
   roundRect(ctx, computer.x, computer.y, computer.width, computer.height, 4, true, false);
 
   // ball
